@@ -1,0 +1,7 @@
+{
+  "cloudflareAccountId": "YOUR_ACCOUNT_ID",
+  "cloudflareApiToken": "YOUR_TOKEN_WITH_PAGES_EDIT",
+  "pagesProject": "agentlab-pages",
+  "pagesBaseUrl": "https://pages.agentlab.in",
+  "indexPassword": "change-me-for-root-id-listing"
+}
