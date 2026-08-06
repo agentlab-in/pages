@@ -12,7 +12,7 @@ const program = new Command();
 program
   .name("alab")
   .description("agentlab CLI")
-  .version("0.1.0");
+  .version("1.0.0");
 
 const pages = program
   .command("pages")
