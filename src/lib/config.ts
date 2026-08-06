@@ -7,12 +7,15 @@ export type AlabConfig = {
   cloudflareApiToken?: string;
   pagesProject?: string;
   pagesBaseUrl?: string;
+  /** Production branch of the Pages project. Must match, or deploys go to preview. */
+  pagesBranch?: string;
   /** If set, root index lists ids behind this password (client-side AES). */
   indexPassword?: string;
 };
 
 const DEFAULT_PROJECT = "agentlab-pages";
 const DEFAULT_BASE_URL = "https://pages.agentlab.in";
+const DEFAULT_BRANCH = "main";
 
 export function loadConfig(): AlabConfig {
   const file = configPath();
@@ -31,6 +34,7 @@ export function resolveConfig(overrides: Partial<AlabConfig> = {}): {
   project: string;
   baseUrl: string;
   indexPassword: string | undefined;
+  branch: string;
 } {
   const file = loadConfig();
   const accountId =
@@ -59,8 +63,13 @@ export function resolveConfig(overrides: Partial<AlabConfig> = {}): {
     overrides.indexPassword ||
     file.indexPassword ||
     undefined;
+  const branch =
+    process.env.ALAB_PAGES_BRANCH?.trim() ||
+    overrides.pagesBranch ||
+    file.pagesBranch ||
+    DEFAULT_BRANCH;
 
-  return { accountId, apiToken, project, baseUrl, indexPassword };
+  return { accountId, apiToken, project, baseUrl, indexPassword, branch };
 }
 
 export function pageUrl(baseUrl: string, id: string): string {

@@ -19,7 +19,19 @@ const pages = program
   .description("Scratch HTML host on Cloudflare Pages")
   .addHelpText(
     "after",
-    "\nQuick start:\n  Put your files in a folder, then run `alab pages put <folder-name>`.\n  That's it, no config or setup needed.\n",
+    [
+      "",
+      "Quick start:",
+      "  Put your files in a folder, then run `alab pages put <folder-name>`.",
+      "  That's it, no config or setup needed.",
+      "",
+      "Deploy branch:",
+      "  Every deploy targets the project's production branch (default `main`),",
+      "  never the branch of whatever git repo you happen to be standing in.",
+      "  Override with ALAB_PAGES_BRANCH or `pagesBranch` in ~/.alab/config.json.",
+      "  Run `alab pages info` to see the branch in effect.",
+      "",
+    ].join("\n"),
   );
 
 pages
@@ -96,6 +108,7 @@ pages
     console.log(`content store ${contentRoot()}`);
     console.log(`project       ${cfg.project}`);
     console.log(`base URL      ${cfg.baseUrl}`);
+    console.log(`deploy branch ${cfg.branch}`);
     console.log(
       `index gate    ${cfg.indexPassword ? "password set" : "off (public landing)"}`,
     );

@@ -18,6 +18,7 @@ alab pages put .
 | Content store | Local: `~/.alab/pages-content/sites/<id>/` |
 | Deploy | `wrangler pages deploy` (via `npx wrangler@4`) |
 | Id stability | `.alab/pages.json` in the published directory |
+| Deploy branch | Always the production branch (`main` by default), pinned with `--branch` |
 
 Not in scope: per-page subdomains, R2/Workers custom hosting, version history, auth on individual pages.
 
@@ -49,6 +50,7 @@ Not in scope: per-page subdomains, R2/Workers custom hosting, version history, a
      "cloudflareApiToken": "YOUR_TOKEN",
      "pagesProject": "agentlab-pages",
      "pagesBaseUrl": "https://pages.agentlab.in",
+     "pagesBranch": "main",
      "indexPassword": "pick-a-strong-password"
    }
    EOF
@@ -110,6 +112,7 @@ alab pages info
 - Max **5 MB** and **200 files** per page.
 - Skips `.git`, `node_modules`, `.alab`, `.env*`.
 - Each `put` redeploys the **full** project snapshot (all pages). Cloudflare free tier is ~500 deployments/month.
+- Deploys pass `--branch` explicitly. Without it wrangler infers the branch from the cwd's git repo, so publishing from any feature branch or agent worktree silently produces a *preview* deployment that never reaches `pages.agentlab.in`.
 
 ## Layout
 

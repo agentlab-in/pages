@@ -11,7 +11,27 @@ export type DeployConfig = {
   project: string;
   baseUrl: string;
   indexPassword: string | undefined;
+  branch: string;
 };
+
+/**
+ * Always pass --branch. Without it wrangler infers the branch from the cwd's
+ * git repo, so a deploy run from any non-production branch (an agent worktree,
+ * a feature branch) silently becomes a preview deployment and never reaches
+ * the custom domain.
+ */
+export function buildDeployArgs(cfg: DeployConfig, outDir: string): string[] {
+  return [
+    "pages",
+    "deploy",
+    outDir,
+    "--project-name",
+    cfg.project,
+    "--branch",
+    cfg.branch,
+    "--commit-dirty=true",
+  ];
+}
 
 export type DeployResult = {
   pageCount: number;
@@ -42,16 +62,7 @@ export async function deployAll(
     CLOUDFLARE_ACCOUNT_ID: cfg.accountId,
   };
 
-  const args = [
-    "pages",
-    "deploy",
-    outDir,
-    "--project-name",
-    cfg.project,
-    "--commit-dirty=true",
-  ];
-
-  const stdout = await runWrangler(args, env);
+  const stdout = await runWrangler(buildDeployArgs(cfg, outDir), env);
 
   // Keep tmp on failure only; success cleans up
   try {
