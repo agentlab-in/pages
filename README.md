@@ -47,13 +47,22 @@ Not in scope: per-page subdomains, R2/Workers custom hosting, version history, a
    cat > ~/.alab/config.json <<'EOF'
    {
      "cloudflareAccountId": "YOUR_ACCOUNT_ID",
-     "cloudflareApiToken": "YOUR_TOKEN",
      "pagesProject": "agentlab-pages",
      "pagesBaseUrl": "https://pages.agentlab.in",
      "pagesBranch": "main",
      "indexPassword": "pick-a-strong-password"
    }
    EOF
+   ```
+
+   On macOS, store the token in Keychain instead of this file. The CLI reads
+   the item named `alab-pages-cloudflare-token` for the current account:
+
+   ```bash
+   read -rsp "Cloudflare token: " token; printf '\n'
+   security add-generic-password -U -a "$USER" \
+     -s "alab-pages-cloudflare-token" -w "$token"
+   unset token
    ```
 
    Prefer env for the token in CI:

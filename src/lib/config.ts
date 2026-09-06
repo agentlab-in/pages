@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { spawnSync } from "node:child_process";
 import { configPath } from "./paths.js";
 
 export type AlabConfig = {
@@ -16,6 +17,7 @@ export type AlabConfig = {
 const DEFAULT_PROJECT = "agentlab-pages";
 const DEFAULT_BASE_URL = "https://pages.agentlab.in";
 const DEFAULT_BRANCH = "main";
+const KEYCHAIN_SERVICE = "alab-pages-cloudflare-token";
 
 export function loadConfig(): AlabConfig {
   const file = configPath();
@@ -45,6 +47,7 @@ export function resolveConfig(overrides: Partial<AlabConfig> = {}): {
   const apiToken =
     process.env.CLOUDFLARE_API_TOKEN?.trim() ||
     overrides.cloudflareApiToken ||
+    readKeychainToken() ||
     file.cloudflareApiToken ||
     "";
   const project =
@@ -70,6 +73,26 @@ export function resolveConfig(overrides: Partial<AlabConfig> = {}): {
     DEFAULT_BRANCH;
 
   return { accountId, apiToken, project, baseUrl, indexPassword, branch };
+}
+
+/** Read the token from macOS Keychain without ever printing it. */
+function readKeychainToken(): string {
+  if (process.platform !== "darwin") return "";
+
+  const result = spawnSync(
+    "security",
+    [
+      "find-generic-password",
+      "-a",
+      process.env.USER || "",
+      "-s",
+      KEYCHAIN_SERVICE,
+      "-w",
+    ],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+  );
+
+  return result.status === 0 ? result.stdout.trim() : "";
 }
 
 export function pageUrl(baseUrl: string, id: string): string {
