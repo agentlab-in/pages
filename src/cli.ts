@@ -1,135 +1,113 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { pathToFileURL } from "node:url";
 import { deleteCommand } from "./commands/delete.js";
 import { lsCommand } from "./commands/ls.js";
 import { openCommand } from "./commands/open.js";
 import { putCommand } from "./commands/put.js";
+import { readCommand } from "./commands/read.js";
+import { setupCommand } from "./commands/setup.js";
 import { resolveConfig } from "./lib/config.js";
 import { alabHome, contentRoot } from "./lib/paths.js";
 
-const program = new Command();
-
-program
-  .name("alab")
-  .description("agentlab CLI")
-  .version("1.0.0");
-
-const pages = program
-  .command("pages")
-  .description("Scratch HTML host on Cloudflare Pages")
-  .addHelpText(
-    "after",
-    [
+function addPagesCommands(root: Command): void {
+  root.command("setup").description("Configure Cloudflare and provision the Pages project")
+    .option("--api-token <token>", "Cloudflare API token")
+    .option("--account-id <id>", "Cloudflare account id")
+    .option("--project <name>", "Cloudflare Pages project name")
+    .option("--branch <name>", "production branch")
+    .option("--base-url <url>", "public base URL")
+    .option("--index-password <password>", "password for the root directory listing")
+    .option("--yes", "disable interactive account selection", false)
+    .option("--json", "machine readable output", false)
+    .addHelpText("after", [
       "",
-      "Quick start:",
-      "  Put your files in a folder, then run `alab pages put <folder-name>`.",
-      "  That's it, no config or setup needed.",
+      "Token setup:",
+      "  Create a token at https://dash.cloudflare.com/profile/api-tokens",
+      "  with Account, Cloudflare Pages, Edit permission for the target account.",
+      "  Interactive entry is hidden. For automation, prefer CLOUDFLARE_API_TOKEN.",
       "",
-      "Deploy branch:",
-      "  Every deploy targets the project's production branch (default `main`),",
-      "  never the branch of whatever git repo you happen to be standing in.",
-      "  Override with ALAB_PAGES_BRANCH or `pagesBranch` in ~/.alab/config.json.",
-      "  Run `alab pages info` to see the branch in effect.",
-      "",
-    ].join("\n"),
-  );
+    ].join("\n"))
+    .action(async (opts) => {
+      await setupCommand(opts);
+    });
 
-pages
-  .command("put")
-  .description("Publish a local directory (create or update)")
-  .argument("[dir]", "directory to publish", ".")
-  .option("--id <id>", "page id (default: .alab/pages.json or new id)")
-  .option("--dry-run", "assemble only; do not call wrangler", false)
-  .option("--skip-deploy", "update local store only", false)
-  .option("--json", "machine-readable output", false)
-  .action(
-    async (
-      dir: string,
-      opts: {
-        id?: string;
-        dryRun?: boolean;
-        skipDeploy?: boolean;
-        json?: boolean;
-      },
-    ) => {
-      await putCommand({
-        dir,
-        id: opts.id,
-        dryRun: opts.dryRun,
-        skipDeploy: opts.skipDeploy,
-        json: opts.json,
-      });
-    },
-  );
+  root.command("put").description("Publish a local directory, creating or updating its page")
+    .argument("[dir]", "directory to publish", ".")
+    .option("--id <id>", "page id, defaults to saved state or a new id")
+    .option("--dry-run", "assemble only and do not deploy", false)
+    .option("--skip-deploy", "update the local store only", false)
+    .option("--json", "machine readable output", false)
+    .action(async (dir: string, opts: { id?: string; dryRun?: boolean; skipDeploy?: boolean; json?: boolean }) => {
+      await putCommand({ dir, ...opts });
+    });
 
-pages
-  .command("ls")
-  .description("List published pages in the local store")
-  .option("--json", "machine-readable output", false)
-  .action((opts: { json?: boolean }) => {
-    lsCommand(opts);
-  });
+  root.command("remove").alias("delete").description("Remove a page and redeploy")
+    .argument("[id]", "page id, defaults to saved state in the current directory")
+    .option("--dry-run", "remove locally and do not redeploy", false)
+    .option("--skip-deploy", "remove from the local store only", false)
+    .option("--json", "machine readable output", false)
+    .action(async (id: string | undefined, opts: { dryRun?: boolean; skipDeploy?: boolean; json?: boolean }) => {
+      await deleteCommand({ id, dryRun: opts.dryRun, skipDeploy: opts.skipDeploy || opts.dryRun, json: opts.json });
+    });
 
-pages
-  .command("open")
-  .description("Open a page URL in the browser")
-  .argument("[id]", "page id (default: .alab/pages.json in cwd)")
-  .action((id: string | undefined) => {
-    openCommand({ id });
-  });
+  root.command("read").description("Show metadata and the public URL for a locally stored page")
+    .argument("[id]", "page id, defaults to saved state in the current directory")
+    .option("--dir <path>", "resolve the page id from a published directory")
+    .option("--json", "machine readable output", false)
+    .action((id: string | undefined, opts: { dir?: string; json?: boolean }) => readCommand({ id, ...opts }));
 
-pages
-  .command("delete")
-  .description("Delete a page and redeploy")
-  .argument("[id]", "page id (default: .alab/pages.json in cwd)")
-  .option("--dry-run", "remove from store only; do not redeploy", false)
-  .option("--skip-deploy", "remove from store only", false)
-  .option("--json", "machine-readable output", false)
-  .action(
-    async (
-      id: string | undefined,
-      opts: { dryRun?: boolean; skipDeploy?: boolean; json?: boolean },
-    ) => {
-      await deleteCommand({
-        id,
-        dryRun: opts.dryRun,
-        skipDeploy: opts.skipDeploy || opts.dryRun,
-        json: opts.json,
-      });
-    },
-  );
+  root.command("list").alias("ls").description("List pages in the local store")
+    .option("--json", "machine readable output", false)
+    .action((opts: { json?: boolean }) => lsCommand(opts));
 
-pages
-  .command("info")
-  .description("Show local paths and config targets")
-  .action(() => {
+  root.command("open").description("Open a page URL in the browser")
+    .argument("[id]", "page id, defaults to saved state in the current directory")
+    .action((id: string | undefined) => openCommand({ id }));
+
+  root.command("info").description("Show local paths and configuration targets").action(() => {
     const cfg = resolveConfig();
     console.log(`ALAB_HOME     ${alabHome()}`);
     console.log(`content store ${contentRoot()}`);
     console.log(`project       ${cfg.project}`);
     console.log(`base URL      ${cfg.baseUrl}`);
     console.log(`deploy branch ${cfg.branch}`);
-    console.log(
-      `index gate    ${cfg.indexPassword ? "password set" : "off (public landing)"}`,
-    );
+    console.log(`index gate    ${cfg.indexPassword ? "password set" : "off (public landing)"}`);
     console.log(`CF token      ${cfg.apiToken ? "set" : "missing"}`);
     console.log(`CF account    ${cfg.accountId ? "set" : "missing"}`);
   });
+}
 
-program.exitOverride();
+const HELP_TEXT = ["", "Quick start:", "  Run `agentlab-pages setup`, then `agentlab-pages put <directory>`.", "", "Every deploy targets the configured production branch.", "Run `agentlab-pages info` to inspect the active configuration.", ""].join("\n");
 
-async function main(): Promise<void> {
+export function createProgram(options?: { legacyAlab?: boolean }): Command {
+  const program = new Command();
+  program.exitOverride();
+  if (options?.legacyAlab) {
+    program.name("alab").description("agentlab CLI").version("2.0.0");
+    const pages = program.command("pages").description("Publish static pages with AgentLab Pages").addHelpText("after", HELP_TEXT);
+    addPagesCommands(pages);
+    return program;
+  }
+  program.name("agentlab-pages").description("Publish static pages to one Cloudflare Pages project").version("2.0.0").addHelpText("after", HELP_TEXT);
+  addPagesCommands(program);
+  return program;
+}
+
+export async function runCli(argv = process.argv): Promise<void> {
+  const program = createProgram({ legacyAlab: argv[2] === "pages" });
   try {
-    await program.parseAsync(process.argv);
+    await program.parseAsync(argv);
   } catch (err) {
-    const e = err as { code?: string; message?: string };
-    if (e?.code === "commander.helpDisplayed" || e?.code === "commander.version") {
-      process.exit(0);
-    }
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`Error: ${msg}`);
-    process.exit(1);
+    const e = err as { code?: string };
+    if (e?.code === "commander.helpDisplayed" || e?.code === "commander.version") return;
+    throw err;
   }
 }
 
-main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  runCli().catch((err: unknown) => {
+    console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    process.exitCode = 1;
+  });
+}

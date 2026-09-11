@@ -68,7 +68,10 @@ export function walkSource(srcDir: string): WalkedFile[] {
       if (name.startsWith(".env")) continue;
       const abs = path.join(dir, name);
       const rel = relBase ? path.join(relBase, name) : name;
-      const st = fs.statSync(abs);
+      const st = fs.lstatSync(abs);
+      if (st.isSymbolicLink()) {
+        throw new Error(`Symbolic links are not allowed: ${rel}`);
+      }
       if (st.isDirectory()) {
         walk(abs, rel);
       } else if (st.isFile()) {

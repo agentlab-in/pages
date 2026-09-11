@@ -71,6 +71,16 @@ describe("store", () => {
     expect(() => putSite("abcd12", src)).toThrow(/index.html/);
   });
 
+  it("rejects symbolic links instead of copying content outside the source", () => {
+    const src = path.join(tmp, "src");
+    const outside = path.join(tmp, "outside.txt");
+    writeFixture(src, { "index.html": "safe" });
+    fs.writeFileSync(outside, "private");
+    fs.symlinkSync(outside, path.join(src, "linked.txt"));
+
+    expect(() => putSite("safe12", src)).toThrow(/Symbolic links are not allowed/);
+  });
+
   it("deletes and lists", () => {
     const src = path.join(tmp, "src");
     writeFixture(src, { "index.html": "a" });

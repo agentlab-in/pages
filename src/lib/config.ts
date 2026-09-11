@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 import { configPath } from "./paths.js";
 
 export type AlabConfig = {
@@ -15,7 +16,6 @@ export type AlabConfig = {
 };
 
 const DEFAULT_PROJECT = "agentlab-pages";
-const DEFAULT_BASE_URL = "https://pages.agentlab.in";
 const DEFAULT_BRANCH = "main";
 const KEYCHAIN_SERVICE = "alab-pages-cloudflare-token";
 
@@ -28,6 +28,38 @@ export function loadConfig(): AlabConfig {
   } catch {
     throw new Error(`Invalid JSON in ${file}`);
   }
+}
+
+export function writeConfig(updates: Partial<AlabConfig>): void {
+  const file = configPath();
+  const current = loadConfig();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(
+    file,
+    JSON.stringify({ ...current, ...updates }, null, 2) + "\n",
+    { encoding: "utf8", mode: 0o600 },
+  );
+  fs.chmodSync(file, 0o600);
+}
+
+/** Store a Cloudflare token in macOS Keychain without printing it. */
+export function writeKeychainToken(token: string): boolean {
+  if (process.platform !== "darwin") return false;
+  const result = spawnSync(
+    "security",
+    [
+      "add-generic-password",
+      "-U",
+      "-a",
+      process.env.USER || "",
+      "-s",
+      KEYCHAIN_SERVICE,
+      "-w",
+      token,
+    ],
+    { stdio: "ignore" },
+  );
+  return result.status === 0;
 }
 
 export function resolveConfig(overrides: Partial<AlabConfig> = {}): {
@@ -59,7 +91,7 @@ export function resolveConfig(overrides: Partial<AlabConfig> = {}): {
     process.env.ALAB_PAGES_BASE_URL?.trim() ||
     overrides.pagesBaseUrl ||
     file.pagesBaseUrl ||
-    DEFAULT_BASE_URL
+    `https://${project}.pages.dev`
   ).replace(/\/$/, "");
   const indexPassword =
     process.env.ALAB_PAGES_INDEX_PASSWORD?.trim() ||

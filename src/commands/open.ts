@@ -22,14 +22,14 @@ export function openCommand(opts: {
   }
   if (!id) {
     throw new Error(
-      "No page id. Pass an id, run from a published dir, or use: alab pages open <id>",
+      "No page id. Pass an id, run from a published dir, or use: agentlab-pages open <id>",
     );
   }
 
   id = assertValidId(id);
   const m = readManifest();
   if (!m.pages[id]) {
-    throw new Error(`Unknown page id "${id}". Run alab pages ls.`);
+    throw new Error(`Unknown page id "${id}". Run agentlab-pages list.`);
   }
 
   const url = pageUrl(cfg.baseUrl, id);

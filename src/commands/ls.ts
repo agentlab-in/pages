@@ -20,7 +20,7 @@ export function lsCommand(opts: { json?: boolean }): void {
   }
 
   if (pages.length === 0) {
-    console.log("No pages yet. Run: alab pages put .");
+    console.log("No pages yet. Run: agentlab-pages put .");
     return;
   }
 
