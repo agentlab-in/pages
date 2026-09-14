@@ -21,7 +21,7 @@ pnpm link --global
 agentlab-pages --help
 ```
 
-For development without a global link, use `pnpm alab <command>`. The package retains `alab pages <command>` for compatibility. Incorporating these commands into a shared compiled `alab` binary is a separate integration project. This package is usable through `agentlab-pages` without that integration.
+For development without a global link, use `pnpm alab <command>`. The package retains `alab pages <command>` for compatibility. Shared binary integrations should import `runCli` from `src/program.ts`; `src/cli.ts` is the executable entry point and starts immediately when loaded.
 
 ## Guided setup
 

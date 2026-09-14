@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createProgram } from "../src/cli.js";
+import { createProgram } from "../src/program.js";
 
 const expectedCommands = ["setup", "put", "remove", "read", "list", "open", "info"];
 
