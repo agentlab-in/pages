@@ -29,14 +29,14 @@ function addPagesCommands(root: Command): void {
   root.command("put").description("Publish a local directory, creating or updating its page")
     .argument("[dir]", "directory to publish", ".")
     .option("--id <id>", "page id, defaults to saved state or a new id")
-    .option("--dry-run", "assemble only and do not deploy", false)
+    .option("--dry-run", "assemble without deploying (local store is still updated)", false)
     .option("--skip-deploy", "update the local store only", false)
     .option("--json", "machine readable output", false)
     .action(async (dir: string, opts: { id?: string; dryRun?: boolean; skipDeploy?: boolean; json?: boolean }) => putCommand({ dir, ...opts }));
 
   root.command("remove").alias("delete").description("Remove a page and redeploy")
     .argument("[id]", "page id, defaults to saved state in the current directory")
-    .option("--dry-run", "remove locally and do not redeploy", false)
+    .option("--dry-run", "remove locally without redeploying", false)
     .option("--skip-deploy", "remove from the local store only", false)
     .option("--json", "machine readable output", false)
     .action(async (id: string | undefined, opts: { dryRun?: boolean; skipDeploy?: boolean; json?: boolean }) => {
@@ -70,18 +70,18 @@ function addPagesCommands(root: Command): void {
   });
 }
 
-const HELP_TEXT = ["", "Quick start:", "  Run `agentlab-pages setup`, then `agentlab-pages put <directory>`.", "", "Every deploy targets the configured production branch.", "Run `agentlab-pages info` to inspect the active configuration.", ""].join("\n");
+const HELP_TEXT = ["", "Quick start:", "  Run `agentlab-pages setup`, then `agentlab-pages put <directory>`.", "", "Deploys use the Cloudflare Pages API directly.", "Every deploy targets the configured production branch.", "--dry-run still updates the local store; it only skips the upload.", "Run `agentlab-pages info` to inspect the active configuration.", ""].join("\n");
 
 export function createProgram(options?: { legacyAlab?: boolean }): Command {
   const program = new Command();
   program.exitOverride();
   if (options?.legacyAlab) {
-    program.name("alab").description("agentlab CLI").version("2.0.0");
+    program.name("alab").description("agentlab CLI").version("2.1.0");
     const pages = program.command("pages").description("Publish static pages with AgentLab Pages").addHelpText("after", HELP_TEXT);
     addPagesCommands(pages);
     return program;
   }
-  program.name("agentlab-pages").description("Publish static pages to one Cloudflare Pages project").version("2.0.0").addHelpText("after", HELP_TEXT);
+  program.name("agentlab-pages").description("Publish static pages to one Cloudflare Pages project").version("2.1.0").addHelpText("after", HELP_TEXT);
   addPagesCommands(program);
   return program;
 }

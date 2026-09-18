@@ -55,7 +55,7 @@ agentlab-pages info
 
 `delete` is an alias for `remove`. `ls` is an alias for `list`.
 
-`read` reads local metadata and prints the public URL. It never downloads deployed files. With no ID, `read`, `open`, and `remove` use `.alab/pages.json` in the current published directory.
+`read` reads local metadata and prints the public URL. It never downloads deployed files. With no ID, `read`, `open`, and `remove` use `.alab/pages.json` in the current published directory. `open` also prints the URL after launching it in the browser. `info` prints local paths and configuration targets without changing anything.
 
 `put` and `remove` update the local full snapshot before deployment. `--dry-run` skips Cloudflare deployment, but it still changes local state. Use an isolated store for experiments:
 
@@ -74,7 +74,7 @@ pnpm alab put "$scratch_root/site" --dry-run --json
 | --- | --- |
 | Content store | `~/.alab/pages-content/sites/<id>/` |
 | Stable ID | Saved in `<published-directory>/.alab/pages.json` |
-| Deployment | Complete local snapshot sent through the Cloudflare API |
+| Deployment | Complete local snapshot sent through the Cloudflare Pages API directly; no Wrangler dependency |
 | Production branch | Always the configured branch, `main` by default |
 | Limits | 200 files and 5 MiB per page |
 | Skipped content | `.git`, `.alab`, `node_modules`, `.env*`, `.DS_Store`, `Thumbs.db` |

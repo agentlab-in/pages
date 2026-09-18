@@ -16,7 +16,7 @@ instructions in the parent directory as well.
 - The optional root password protects only the directory listing. It does not
   restrict direct access to any published page.
 - One deployment contains the complete local snapshot of every stored page. A
-  put or delete can therefore affect the deployed project as a whole.
+  put or remove can therefore affect the deployed project as a whole.
 - Cloudflare Pages, its project configuration, custom domains, and DNS are
   external infrastructure. Do not change any of them unless explicitly asked.
 
@@ -27,8 +27,9 @@ instructions in the parent directory as well.
 - The package is ESM and TypeScript uses `NodeNext` module resolution.
 - Source imports include `.js` extensions intentionally so compiled ESM works.
   Preserve that convention in TypeScript files.
-- The CLI invokes `npx --yes wrangler@4` for deployments. Wrangler is not a
-  repository dependency and does not need a global installation.
+- Deployments use the Cloudflare Pages REST API directly through `fetch` in
+  `src/lib/deploy.ts` and `src/lib/cloudflare.ts`. There is no Wrangler
+  dependency, subprocess, or global installation.
 
 Useful commands:
 
@@ -36,8 +37,8 @@ Useful commands:
 pnpm install
 pnpm build
 pnpm test
-pnpm alab pages info
-pnpm alab pages put <directory> --dry-run
+pnpm alab info
+pnpm alab put <directory> --dry-run
 ```
 
 `pnpm link --global` changes the developer's global environment. Run it only when
@@ -48,21 +49,34 @@ explicitly requested.
 The execution path is intentionally shallow:
 
 ```text
-src/cli.ts
-  -> src/commands/{put,delete,ls,open}.ts
-  -> src/lib/{config,state,store,assemble,deploy,index-html,id,paths}.ts
-  -> local content store and, for a real deploy, Cloudflare Pages
+src/cli.ts (thin executable entry)
+  -> src/program.ts (Commander wiring, side-effect free for integration)
+  -> src/commands/{setup,put,delete,ls,read,open}.ts
+  -> src/lib/{config,state,store,assemble,deploy,cloudflare,index-html,id,paths}.ts
+  -> local content store and, for a real deploy, the Cloudflare Pages API
 ```
 
 Key responsibilities:
 
-- `src/cli.ts` defines Commander commands, options, help text, exit behavior, and
-  the read-only `pages info` command.
+- `src/cli.ts` is the executable entry point. It calls `runCli()` immediately
+  when loaded and re-exports `createProgram` and `runCli` from
+  `src/program.ts`. Shared binary integrations must import from
+  `src/program.ts`, never from `src/cli.ts`.
+- `src/program.ts` defines Commander commands, options, help text, exit
+  behavior, the read-only `info` command, and the legacy `alab pages`
+  compatibility route.
+- `src/commands/setup.ts` prompts for or accepts a Cloudflare API token,
+  selects an account, creates or reuses the Pages project, stores the token
+  in macOS Keychain when available, and writes local configuration.
 - `src/commands/put.ts` resolves the source directory, chooses an ID, copies the
   source into the store, writes per-directory state, then assembles or deploys.
-- `src/commands/delete.ts` resolves and validates an ID, removes it from the local
+- `src/commands/delete.ts` backs the `remove` command (`delete` is an alias).
+  It resolves and validates an ID, removes it from the local
   store, clears matching per-directory state, then optionally redeploys.
-- `src/commands/ls.ts` lists the local store and derives public URLs.
+- `src/commands/ls.ts` backs `list` (`ls` is an alias). It lists the local
+  store and derives public URLs.
+- `src/commands/read.ts` shows local metadata and the public URL for one page.
+  It never downloads deployed files.
 - `src/commands/open.ts` validates a locally known ID, launches the platform URL
   opener, and prints the URL.
 - `src/lib/config.ts` merges environment variables, explicit overrides, config
@@ -77,9 +91,13 @@ Key responsibilities:
   all stored sites, the root index, and `_manifest.json`.
 - `src/lib/index-html.ts` generates either the public root landing page or the
   client-side encrypted directory listing.
-- `src/lib/deploy.ts` always passes an explicit production branch to Wrangler.
-  This prevents a feature branch or worktree from silently becoming a preview
-  deployment.
+- `src/lib/deploy.ts` talks to the Cloudflare Pages API directly with `fetch`:
+  request an asset upload token, check missing content hashes, upload missing
+  assets, upsert hashes, create a deployment with an explicit production
+  branch, then poll until it succeeds or fails. The explicit branch prevents
+  a feature branch or worktree from silently becoming a preview deployment.
+- `src/lib/cloudflare.ts` lists Cloudflare accounts and creates or reuses the
+  configured Pages project during setup.
 - `src/lib/id.ts` is the sole authority for page ID generation and validation.
 
 ## State and side effects
@@ -120,17 +138,19 @@ Treat command flags according to their actual behavior, not their names alone:
 
 | Command | Local store | Source `.alab/pages.json` | Temp assembly | Cloudflare |
 | --- | --- | --- | --- | --- |
-| `pages info` | May read config paths | No change | No | No |
-| `pages ls` | Reconciles and rewrites manifest | No change | No | No |
-| `pages open` | Reads manifest | No change | No | No, but opens browser |
-| `pages put --skip-deploy` | Writes or replaces page | Writes | No | No |
-| `pages put --dry-run` | Writes or replaces page | Writes | Yes | No |
-| `pages put` | Writes or replaces page | Writes | Yes | Yes |
-| `pages delete --skip-deploy` | Deletes page | Clears matching state | No | No |
-| `pages delete --dry-run` | Deletes page | Clears matching state | No | No |
-| `pages delete` | Deletes page | Clears matching state | Yes | Yes |
+| `info` | May read config paths | No change | No | No |
+| `list` / `ls` | Reconciles and rewrites manifest | No change | No | No |
+| `read` | Reads manifest | No change | No | No |
+| `open` | Reads manifest | No change | No | No, but opens browser |
+| `setup` | No change to pages; writes config and may use Keychain | No change | No | Yes: validates token, lists accounts, creates or reuses project |
+| `put --skip-deploy` | Writes or replaces page | Writes | No | No |
+| `put --dry-run` | Writes or replaces page | Writes | Yes | No |
+| `put` | Writes or replaces page | Writes | Yes | Yes |
+| `remove` / `delete --skip-deploy` | Deletes page | Clears matching state | No | No |
+| `remove` / `delete --dry-run` | Deletes page | Clears matching state | No | No |
+| `remove` / `delete` | Deletes page | Clears matching state | Yes | Yes |
 
-Important: `--dry-run` is deployment-only. It does not make `put` or `delete`
+Important: `--dry-run` is deployment-only. It does not make `put` or `remove`
 read-only. Both commands mutate local user state before deployment is skipped.
 Never run either against the real local store merely to inspect behavior.
 
@@ -139,8 +159,9 @@ MiB total, and skips `.git`, `.alab`, `node_modules`, `.DS_Store`, `Thumbs.db`,
 and names beginning with `.env`. Explicit IDs normalize to lowercase and must be
 4 to 32 lowercase ASCII letters or digits.
 
-`delete` rejects IDs absent from the local manifest. A successful local deletion
-before a failed deploy remains a local deletion. Do not assume rollback.
+`remove` (`delete` is an alias) rejects IDs absent from the local manifest.
+A successful local deletion before a failed deploy remains a local deletion.
+Do not assume rollback.
 
 ## Safe development workflow
 
@@ -152,17 +173,18 @@ export ALAB_HOME="$scratch_root/home"
 export ALAB_PAGES_CONTENT="$scratch_root/content"
 mkdir -p "$scratch_root/site"
 printf '<h1>test</h1>\n' > "$scratch_root/site/index.html"
-pnpm alab pages put "$scratch_root/site" --dry-run --json
+pnpm alab put "$scratch_root/site" --dry-run --json
 ```
 
-Do not set Cloudflare credentials for local tests. A safe dry run must never invoke
-Wrangler or contact Cloudflare. Remove the explicit temporary directory after
+Do not set Cloudflare credentials for local tests. A safe dry run must never
+contact Cloudflare. Remove the explicit temporary directory after
 inspection. Do not use broad paths or unresolved variables for cleanup.
 
-When changing deployment behavior, test argument construction directly rather
-than running Wrangler. Preserve the explicit `--branch <configured-branch>` and
-`--commit-dirty=true` arguments unless the product contract is intentionally
-being changed.
+When changing deployment behavior, test `deployAll` and `uploadSnapshot`
+directly with an injected `fetch` mock rather than contacting Cloudflare.
+Preserve the explicit production `branch` and `commit_dirty` deployment fields
+and the upload-token, check-missing, upload, upsert-hashes, deployments
+sequence unless the product contract is intentionally being changed.
 
 ## Security and public content
 
@@ -192,7 +214,13 @@ relevant suite:
 - `store.test.ts`: source walking, validation, replacement, manifest, deletion.
 - `state.test.ts`: per-directory ID state lifecycle.
 - `assemble.test.ts`: full snapshot layout and public or encrypted root indexes.
-- `deploy.test.ts`: Wrangler argument construction and production branch pinning.
+- `deploy.test.ts`: direct Pages API upload sequence, production branch
+  pinning, and deployment polling with an injected `fetch` mock.
+- `cloudflare.test.ts`: account listing and project creation or reuse.
+- `setup.test.ts`: setup prompts, account selection, config and Keychain writes.
+- `read.test.ts`: local metadata reads and URL derivation.
+- `cli.test.ts`: standalone and legacy `alab pages` command surfaces and the
+  side-effect free `src/program.ts` integration entry point.
 - `id.test.ts`: ID format, normalization, generation, and traversal rejection.
 
 For normal code changes, run both:

@@ -1,6 +1,6 @@
 {
   "name": "@agentlab/pages",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Scratch web host CLI: publish tiny HTML apps to Cloudflare Pages",
   "type": "module",
   "bin": {
