@@ -23,7 +23,7 @@ export async function deleteCommand(opts: DeleteOptions): Promise<void> {
     id = local?.id;
   }
   if (!id) {
-    throw new Error("Pass a page id: agentlab-pages remove <id>");
+    throw new Error("Pass a page id: alab pages remove <id>");
   }
 
   id = assertValidId(id);

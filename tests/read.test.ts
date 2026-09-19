@@ -61,7 +61,7 @@ describe("readCommand", () => {
 
   it("rejects an id absent from the local manifest", () => {
     expect(() => readCommand({ id: "missing1" })).toThrow(
-      'Unknown page id "missing1". Run agentlab-pages list.',
+      'Unknown page id "missing1". Run alab pages list.',
     );
   });
 });

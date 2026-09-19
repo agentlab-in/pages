@@ -1,38 +1,39 @@
 # AgentLab Pages
 
-AgentLab Pages is a standalone CLI for publishing small static sites to one Cloudflare Pages project. A published directory keeps a stable public URL at `https://<project>.pages.dev/<id>/`, or at an explicitly configured custom base URL.
+AgentLab Pages is the implementation behind `alab pages`: publishing small static sites to one Cloudflare Pages project. A published directory keeps a stable public URL at `https://<project>.pages.dev/<id>/`, or at an explicitly configured custom base URL.
+
+This package publishes no executables. Users run the single `alab` binary:
 
 ```bash
-agentlab-pages setup
-agentlab-pages put ./site
-agentlab-pages read
+alab pages setup
+alab pages put ./site
+alab pages read
 ```
 
 Every page URL is public. The optional root password obscures only the directory listing. It does not protect direct page URLs.
 
 ## Install and run
 
-This repository requires Node.js 20 or newer and pnpm.
+Users install the `alab` binary and need no Node.js setup. This repository requires Node.js 20 or newer and pnpm for development:
 
 ```bash
 pnpm install
 pnpm build
-pnpm link --global
-agentlab-pages --help
+pnpm alab pages --help
 ```
 
-For development without a global link, use `pnpm alab <command>`. The package retains `alab pages <command>` for compatibility. Shared binary integrations should import `runCli` from `src/program.ts`; `src/cli.ts` is the executable entry point and starts immediately when loaded.
+Shared binary integrations must import `createPagesCommand` from `src/program.ts` and mount it with `addCommand`; `src/cli.ts` is a development-only entry point and starts immediately when loaded, so never import it.
 
 ## Guided setup
 
-Run `agentlab-pages setup`. It prompts for a Cloudflare API token, validates it, lets you select an accessible account, and creates or reuses the configured Pages project. On macOS, the token is stored in Keychain. Other configuration is stored under `~/.alab/`.
+Run `alab pages setup`. It prompts for a Cloudflare API token, validates it, lets you select an accessible account, and creates or reuses the configured Pages project. On macOS, the token is stored in Keychain. Other configuration is stored under `~/.alab/`.
 
 Create the token at [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens) with `Account`, `Cloudflare Pages`, `Edit` permission for the target account. Interactive token input is hidden.
 
 For automation:
 
 ```bash
-agentlab-pages setup \
+alab pages setup \
   --account-id "$CLOUDFLARE_ACCOUNT_ID" \
   --project agentlab-pages \
   --branch main \
@@ -44,13 +45,13 @@ Environment variables remain supported for CI. Do not put credentials in publish
 ## Commands
 
 ```text
-agentlab-pages setup [options]
-agentlab-pages put [dir] [--id <id>] [--dry-run] [--skip-deploy] [--json]
-agentlab-pages remove [id] [--dry-run] [--skip-deploy] [--json]
-agentlab-pages read [id] [--dir <path>] [--json]
-agentlab-pages list [--json]
-agentlab-pages open [id]
-agentlab-pages info
+alab pages setup [options]
+alab pages put [dir] [--id <id>] [--dry-run] [--skip-deploy] [--json]
+alab pages remove [id] [--dry-run] [--skip-deploy] [--json]
+alab pages read [id] [--dir <path>] [--json]
+alab pages list [--json]
+alab pages open [id]
+alab pages info
 ```
 
 `delete` is an alias for `remove`. `ls` is an alias for `list`.
@@ -65,7 +66,7 @@ export ALAB_HOME="$scratch_root/home"
 export ALAB_PAGES_CONTENT="$scratch_root/content"
 mkdir -p "$scratch_root/site"
 printf '<h1>test</h1>\n' > "$scratch_root/site/index.html"
-pnpm alab put "$scratch_root/site" --dry-run --json
+pnpm alab pages put "$scratch_root/site" --dry-run --json
 ```
 
 ## Publishing model
