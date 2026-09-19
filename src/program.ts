@@ -70,29 +70,22 @@ function addPagesCommands(root: Command): void {
   });
 }
 
-const HELP_TEXT = ["", "Quick start:", "  Run `agentlab-pages setup`, then `agentlab-pages put <directory>`.", "", "Deploys use the Cloudflare Pages API directly.", "Every deploy targets the configured production branch.", "--dry-run still updates the local store; it only skips the upload.", "Run `agentlab-pages info` to inspect the active configuration.", ""].join("\n");
+const HELP_TEXT = ["", "Quick start:", "  Run `alab pages setup`, then `alab pages put <directory>`.", "", "Deploys use the Cloudflare Pages API directly.", "Every deploy targets the configured production branch.", "--dry-run still updates the local store; it only skips the upload.", "Run `alab pages info` to inspect the active configuration.", ""].join("\n");
 
-export function createProgram(options?: { legacyAlab?: boolean }): Command {
-  const program = new Command();
-  program.exitOverride();
-  if (options?.legacyAlab) {
-    program.name("alab").description("agentlab CLI").version("2.1.0");
-    const pages = program.command("pages").description("Publish static pages with AgentLab Pages").addHelpText("after", HELP_TEXT);
-    addPagesCommands(pages);
-    return program;
-  }
-  program.name("agentlab-pages").description("Publish static pages to one Cloudflare Pages project").version("2.1.0").addHelpText("after", HELP_TEXT);
-  addPagesCommands(program);
-  return program;
+const PAGES_VERSION = "3.0.0";
+
+export function createPagesCommand(): Command {
+  const pages = new Command("pages");
+  pages.exitOverride();
+  pages.description("Publish static pages with AgentLab Pages").version(PAGES_VERSION).addHelpText("after", HELP_TEXT);
+  addPagesCommands(pages);
+  return pages;
 }
 
-export async function runCli(argv = process.argv): Promise<void> {
-  const program = createProgram({ legacyAlab: argv[2] === "pages" });
-  try {
-    await program.parseAsync(argv);
-  } catch (err) {
-    const e = err as { code?: string };
-    if (e?.code === "commander.helpDisplayed" || e?.code === "commander.version") return;
-    throw err;
-  }
+export function createProgram(): Command {
+  const program = new Command();
+  program.exitOverride();
+  program.name("alab").description("agentlab CLI").version(PAGES_VERSION);
+  program.addCommand(createPagesCommand());
+  return program;
 }

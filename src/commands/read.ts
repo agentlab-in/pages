@@ -22,14 +22,14 @@ export function readCommand(opts: ReadCommandOptions): void {
   }
   if (!id) {
     throw new Error(
-      "No page id. Pass an id, run from a published dir, or use: agentlab-pages read <id>",
+      "No page id. Pass an id, run from a published dir, or use: alab pages read <id>",
     );
   }
 
   const safeId = assertValidId(id);
   const entry = readManifest().pages[safeId];
   if (!entry) {
-    throw new Error(`Unknown page id "${safeId}". Run agentlab-pages list.`);
+    throw new Error(`Unknown page id "${safeId}". Run alab pages list.`);
   }
 
   const result = {

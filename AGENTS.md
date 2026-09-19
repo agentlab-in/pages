@@ -1,8 +1,12 @@
 # AgentLab Pages
 
-This repository contains `@agentlab/pages`, a small Node.js and TypeScript CLI for
-publishing directories of static files to one Cloudflare Pages project. Its public
-URL namespace is `https://pages.agentlab.in/<id>/`.
+This repository contains `@agentlab/pages`, the implementation behind
+`alab pages`: publishing directories of static files to one Cloudflare Pages
+project. Its public URL namespace is `https://pages.agentlab.in/<id>/`.
+
+The package publishes no bins. Users run the single `alab` binary owned by
+`alab-cli`, which mounts this repository's `pages` command. Development runs
+through `pnpm alab pages ...`.
 
 These instructions apply only inside this repository. Follow the workspace-level
 instructions in the parent directory as well.
@@ -37,20 +41,21 @@ Useful commands:
 pnpm install
 pnpm build
 pnpm test
-pnpm alab info
-pnpm alab put <directory> --dry-run
+pnpm alab pages info
+pnpm alab pages put <directory> --dry-run
 ```
 
-`pnpm link --global` changes the developer's global environment. Run it only when
-explicitly requested.
+This package publishes no bins, so there is nothing to link globally. The
+`pnpm alab` script runs the development-only `src/cli.ts`, which behaves like
+the `alab` binary root with the `pages` command mounted.
 
 ## Architecture
 
 The execution path is intentionally shallow:
 
 ```text
-src/cli.ts (thin executable entry)
-  -> src/program.ts (Commander wiring, side-effect free for integration)
+src/cli.ts (development-only entry, behaves like the alab binary root)
+  -> src/program.ts (createPagesCommand mountable builder, side-effect free for integration)
   -> src/commands/{setup,put,delete,ls,read,open}.ts
   -> src/lib/{config,state,store,assemble,deploy,cloudflare,index-html,id,paths}.ts
   -> local content store and, for a real deploy, the Cloudflare Pages API
@@ -58,13 +63,17 @@ src/cli.ts (thin executable entry)
 
 Key responsibilities:
 
-- `src/cli.ts` is the executable entry point. It calls `runCli()` immediately
-  when loaded and re-exports `createProgram` and `runCli` from
+- `src/cli.ts` is a development-only entry point. It builds the dev root,
+  parses once, and re-exports `createPagesCommand` and `createProgram` from
   `src/program.ts`. Shared binary integrations must import from
   `src/program.ts`, never from `src/cli.ts`.
-- `src/program.ts` defines Commander commands, options, help text, exit
-  behavior, the read-only `info` command, and the legacy `alab pages`
-  compatibility route.
+- `src/program.ts` exports `createPagesCommand`, the mountable `pages`
+  command the `alab` binary attaches with `addCommand`, and `createProgram`,
+  the dev root named `alab` with `pages` mounted. There are no standalone
+  top-level commands and no legacy compatibility route. It also defines the
+  read-only `info` command, Commander options, help text, and exit behavior.
+  Both the dev root and the mountable `pages` command use `exitOverride`, so
+  errors throw instead of exiting and the hosting binary owns exit codes.
 - `src/commands/setup.ts` prompts for or accepts a Cloudflare API token,
   selects an account, creates or reuses the Pages project, stores the token
   in macOS Keychain when available, and writes local configuration.
@@ -173,7 +182,7 @@ export ALAB_HOME="$scratch_root/home"
 export ALAB_PAGES_CONTENT="$scratch_root/content"
 mkdir -p "$scratch_root/site"
 printf '<h1>test</h1>\n' > "$scratch_root/site/index.html"
-pnpm alab put "$scratch_root/site" --dry-run --json
+pnpm alab pages put "$scratch_root/site" --dry-run --json
 ```
 
 Do not set Cloudflare credentials for local tests. A safe dry run must never
@@ -219,8 +228,9 @@ relevant suite:
 - `cloudflare.test.ts`: account listing and project creation or reuse.
 - `setup.test.ts`: setup prompts, account selection, config and Keychain writes.
 - `read.test.ts`: local metadata reads and URL derivation.
-- `cli.test.ts`: standalone and legacy `alab pages` command surfaces and the
-  side-effect free `src/program.ts` integration entry point.
+- `cli.test.ts`: the single `pages` mount surface on the dev root and on
+  `createPagesCommand`, the side-effect free `src/program.ts` integration
+  entry point, exact help streams, and exact error streams and exit status.
 - `id.test.ts`: ID format, normalization, generation, and traversal rejection.
 
 For normal code changes, run both:
