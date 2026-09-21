@@ -2,7 +2,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { deployAll, uploadSnapshot, type DeployConfig } from "../src/lib/deploy.js";
+import {
+  deployAll,
+  discoverDeploymentBaseUrl,
+  uploadSnapshot,
+  type DeployConfig,
+} from "../src/lib/deploy.js";
 import { putSite } from "../src/lib/store.js";
 
 const cfg: DeployConfig = {
@@ -28,6 +33,54 @@ afterEach(() => {
 });
 
 describe("direct Cloudflare deployment", () => {
+  it("uses the only active custom domain when the saved URL is stale", async () => {
+    const request = vi.fn<typeof fetch>(async () => jsonResponse({
+      success: true,
+      result: [
+        { name: "pending.example.test", status: "pending" },
+        { name: "pages.hsbhandari.dev", status: "active" },
+      ],
+    }));
+
+    await expect(discoverDeploymentBaseUrl(cfg, request)).resolves.toBe(
+      "https://pages.hsbhandari.dev",
+    );
+    expect(request.mock.calls[0]?.[0]).toBe(
+      "https://api.cloudflare.com/client/v4/accounts/acct%2Fid/pages/projects/agentlab%20pages/domains",
+    );
+  });
+
+  it("preserves the configured URL when several active domains exist", async () => {
+    const request = vi.fn<typeof fetch>(async () => jsonResponse({
+      success: true,
+      result: [
+        { name: "pages.agentlab.in", status: "active" },
+        { name: "pages.hsbhandari.dev", status: "active" },
+      ],
+    }));
+
+    await expect(discoverDeploymentBaseUrl(cfg, request)).resolves.toBe(
+      "https://pages.agentlab.in",
+    );
+  });
+
+  it("falls back to pages.dev when no active domain matches", async () => {
+    const request = vi.fn<typeof fetch>(async () => jsonResponse({
+      success: true,
+      result: [
+        { name: "one.example.test", status: "active" },
+        { name: "two.example.test", status: "active" },
+      ],
+    }));
+
+    await expect(discoverDeploymentBaseUrl(
+      { ...cfg, project: "agentlab-pages" },
+      request,
+    )).resolves.toBe(
+      "https://agentlab-pages.pages.dev",
+    );
+  });
+
   it("uploads every asset and creates a deployment on the configured branch", async () => {
     const out = path.join(tmp, "snapshot");
     fs.mkdirSync(path.join(out, "site"), { recursive: true });
@@ -136,6 +189,7 @@ describe("direct Cloudflare deployment", () => {
     fs.writeFileSync(path.join(source, "index.html"), "<h1>site</h1>");
     putSite("site01", source);
     const responses = [
+      jsonResponse({ success: true, result: [{ name: "pages.hsbhandari.dev", status: "active" }] }),
       jsonResponse({ success: true, result: { jwt: "jwt" } }),
       jsonResponse({ success: true, result: [] }),
       jsonResponse({ success: true, result: null }),

@@ -14,13 +14,14 @@ export type DeployConfig = {
   branch: string;
 };
 
-export type DeployResult = { pageCount: number; outDir: string; stdout: string };
+export type DeployResult = { pageCount: number; outDir: string; stdout: string; baseUrl: string };
 type CloudflareError = { code?: number; message?: string };
 type CloudflareEnvelope<T> = { success?: boolean; result?: T; errors?: CloudflareError[] };
 type CloudflareDeployment = {
   id: string;
   latest_stage?: { name?: string; status?: string };
 };
+type CloudflareDomain = { name?: string; status?: string };
 type Asset = { filePath: string; hash: string; contentType: string; size: number };
 const API_BASE = "https://api.cloudflare.com/client/v4";
 const MAX_UPLOAD_BYTES = 40 * 1024 * 1024;
@@ -30,28 +31,64 @@ export async function deployAll(
   cfg: DeployConfig,
   opts: { dryRun?: boolean; fetch?: typeof fetch } = {},
 ): Promise<DeployResult> {
+  const request = opts.fetch ?? fetch;
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "alab-pages-deploy-"));
-  const { pageCount } = assembleDeployRoot({
-    outDir,
-    indexPassword: cfg.indexPassword,
-    baseUrl: cfg.baseUrl,
-  });
 
   if (opts.dryRun) {
-    return { pageCount, outDir, stdout: "(dry-run: skipped Cloudflare upload)" };
+    const baseUrl = cfg.baseUrl;
+    const { pageCount } = assembleDeployRoot({
+      outDir,
+      indexPassword: cfg.indexPassword,
+      baseUrl,
+    });
+    return { pageCount, outDir, stdout: "(dry-run: skipped Cloudflare upload)", baseUrl };
   }
-  requireDeployAuth(cfg);
 
   try {
-    const deployment = await uploadSnapshot(cfg, outDir, opts.fetch ?? fetch);
+    const baseUrl = await discoverDeploymentBaseUrl(cfg, request);
+    const { pageCount } = assembleDeployRoot({
+      outDir,
+      indexPassword: cfg.indexPassword,
+      baseUrl,
+    });
+    const deployment = await uploadSnapshot(cfg, outDir, request);
     fs.rmSync(outDir, { recursive: true, force: true });
-    return { pageCount, outDir, stdout: JSON.stringify(deployment) };
+    return { pageCount, outDir, stdout: JSON.stringify(deployment), baseUrl };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
       `Cloudflare Pages deployment failed. Assembled files remain at ${outDir}. ${message}`,
       { cause: error },
     );
+  }
+}
+
+export async function discoverDeploymentBaseUrl(
+  cfg: DeployConfig,
+  request: typeof fetch,
+): Promise<string> {
+  requireDeployAuth(cfg);
+  const domains = await cloudflareRequest<CloudflareDomain[]>(
+    request,
+    `${API_BASE}/accounts/${encodeURIComponent(cfg.accountId)}/pages/projects/${encodeURIComponent(cfg.project)}/domains`,
+    { headers: { Authorization: `Bearer ${cfg.apiToken}` } },
+    "list project domains",
+  );
+  const activeDomains = domains
+    .filter((domain) => domain.status === "active" && domain.name)
+    .map((domain) => domain.name!);
+  const configuredHostname = hostname(cfg.baseUrl);
+  const configuredDomain = activeDomains.find((domain) => domain === configuredHostname);
+  if (configuredDomain) return cfg.baseUrl.replace(/\/$/, "");
+  if (activeDomains.length === 1) return `https://${activeDomains[0]}`;
+  return `https://${cfg.project}.pages.dev`;
+}
+
+function hostname(url: string): string | undefined {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return undefined;
   }
 }
 

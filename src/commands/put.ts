@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { pageUrl, resolveConfig } from "../lib/config.js";
+import { pageUrl, resolveConfig, writeConfig } from "../lib/config.js";
 import { deployAll } from "../lib/deploy.js";
 import {
   allocateId,
@@ -17,7 +17,13 @@ export type PutOptions = {
   skipDeploy?: boolean;
 };
 
-export async function putCommand(opts: PutOptions): Promise<void> {
+type PutDeps = { deploy: typeof deployAll };
+
+export async function putCommand(
+  opts: PutOptions,
+  injected: Partial<PutDeps> = {},
+): Promise<void> {
+  const deploy = injected.deploy ?? deployAll;
   const absDir = path.resolve(opts.dir);
   if (!fs.existsSync(absDir) || !fs.statSync(absDir).isDirectory()) {
     throw new Error(`Not a directory: ${opts.dir}`);
@@ -27,7 +33,7 @@ export async function putCommand(opts: PutOptions): Promise<void> {
   const local = readLocalState(absDir);
   const id = allocateId(opts.id ?? local?.id);
   const stats = putSite(id, absDir);
-  const url = pageUrl(cfg.baseUrl, id);
+  let url = pageUrl(cfg.baseUrl, id);
 
   writeLocalState(absDir, { id, url });
 
@@ -50,7 +56,7 @@ export async function putCommand(opts: PutOptions): Promise<void> {
   }
 
   if (opts.dryRun) {
-    const result = await deployAll(cfg, { dryRun: true });
+    const result = await deploy(cfg, { dryRun: true });
     if (opts.json) {
       console.log(
         JSON.stringify(
@@ -74,7 +80,10 @@ export async function putCommand(opts: PutOptions): Promise<void> {
     return;
   }
 
-  const result = await deployAll(cfg);
+  const result = await deploy(cfg);
+  url = pageUrl(result.baseUrl, id);
+  writeConfig({ pagesBaseUrl: result.baseUrl });
+  writeLocalState(absDir, { id, url });
   if (opts.json) {
     console.log(
       JSON.stringify(
