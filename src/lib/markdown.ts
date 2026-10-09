@@ -92,11 +92,6 @@ export function loadMarkdownFile(filePath: string): LoadedMarkdown {
   if (stat.size === 0) {
     throw new Error("Markdown file is empty.");
   }
-  if (stat.size > MAX_BYTES) {
-    throw new Error(
-      `Page too large (${formatBytes(stat.size)}). Max is ${formatBytes(MAX_BYTES)}.`,
-    );
-  }
   const raw = fs.readFileSync(filePath);
   let text: string;
   try {
@@ -118,16 +113,19 @@ export function loadMarkdownFile(filePath: string): LoadedMarkdown {
 /** Stage index.html plus the original Markdown bytes. Caller deletes the directory. */
 export function stageMarkdownSite(filePath: string): { dir: string; loaded: LoadedMarkdown } {
   const loaded = loadMarkdownFile(filePath);
+  const html = renderMarkdownPage({
+    title: loaded.title,
+    markdown: loaded.text,
+    sourceName: loaded.filename,
+  });
+  const total = loaded.bytes + Buffer.byteLength(html, "utf8");
+  if (total > MAX_BYTES) {
+    throw new Error(
+      `Page too large (${formatBytes(total)}). Max is ${formatBytes(MAX_BYTES)}.`,
+    );
+  }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "alab-md-"));
   fs.copyFileSync(filePath, path.join(dir, loaded.filename));
-  fs.writeFileSync(
-    path.join(dir, "index.html"),
-    renderMarkdownPage({
-      title: loaded.title,
-      markdown: loaded.text,
-      sourceName: loaded.filename,
-    }),
-    "utf8",
-  );
+  fs.writeFileSync(path.join(dir, "index.html"), html, "utf8");
   return { dir, loaded };
 }

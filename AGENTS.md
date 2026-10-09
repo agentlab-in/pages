@@ -169,7 +169,8 @@ escaped static `index.html`. Its stable id lives in
 `<parent>/.alab/markdown/<filename>.json`, so publishing the same file again
 replaces that page. Front matter is plain text. The title is the first ATX
 heading, otherwise the filename. Empty files, invalid UTF-8, other file types,
-and files over the size limit are rejected. A directory publish accepts at most
+and staged pages over the size limit are rejected. The limit is the original
+file plus the rendered HTML, because the HTML contains a second copy of the text. A directory publish accepts at most
 200 files and 5 MiB total, and skips `.git`, `.alab`, `node_modules`,
 `.DS_Store`, `Thumbs.db`, and names beginning with `.env`. Explicit IDs
 normalize to lowercase and must be 4 to 32 lowercase ASCII letters or digits.

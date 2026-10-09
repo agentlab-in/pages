@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { putCommand } from "../src/commands/put.js";
-import { loadMarkdownFile, renderMarkdownPage, titleFromMarkdown } from "../src/lib/markdown.js";
-import { MAX_BYTES } from "../src/lib/store.js";
+import { loadMarkdownFile, renderMarkdownPage, stageMarkdownSite, titleFromMarkdown } from "../src/lib/markdown.js";
+import { formatBytes, MAX_BYTES } from "../src/lib/store.js";
 import { siteDir } from "../src/lib/paths.js";
 
 let tmp: string;
@@ -90,7 +90,24 @@ describe("markdown publish", () => {
 
     const huge = path.join(tmp, "huge.md");
     fs.writeFileSync(huge, Buffer.alloc(MAX_BYTES + 1, 0x61));
-    expect(() => loadMarkdownFile(huge)).toThrow(/too large/i);
+    expect(() => stageMarkdownSite(huge)).toThrow(/too large/i);
+
+    const underSourceLimit = path.join(tmp, "wide.md");
+    const body = Buffer.alloc(Math.floor(MAX_BYTES * 0.6), 0x61);
+    fs.writeFileSync(underSourceLimit, body);
+    const loaded = loadMarkdownFile(underSourceLimit);
+    expect(loaded.bytes).toBeLessThan(MAX_BYTES);
+    const html = renderMarkdownPage({
+      title: loaded.title,
+      markdown: loaded.text,
+      sourceName: loaded.filename,
+    });
+    const total = loaded.bytes + Buffer.byteLength(html, "utf8");
+    expect(total).toBeGreaterThan(MAX_BYTES);
+    expect(() => stageMarkdownSite(underSourceLimit)).toThrow(
+      `Page too large (${formatBytes(total)}). Max is ${formatBytes(MAX_BYTES)}.`,
+    );
+    expect(fs.existsSync(path.join(process.env.ALAB_PAGES_CONTENT!, "sites"))).toBe(false);
 
     const binary = path.join(tmp, "bad.md");
     fs.writeFileSync(binary, Buffer.from([0xff, 0xfe, 0xfd]));
