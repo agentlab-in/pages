@@ -26,8 +26,8 @@ function addPagesCommands(root: Command): void {
     ].join("\n"))
     .action(async (opts) => setupCommand(opts));
 
-  root.command("put").description("Publish a local directory, creating or updating its page")
-    .argument("[dir]", "directory to publish", ".")
+  root.command("put").description("Publish a local directory or Markdown file, creating or updating its page")
+    .argument("[dir]", "directory or .md/.markdown file to publish", ".")
     .option("--id <id>", "page id, defaults to saved state or a new id")
     .option("--dry-run", "assemble without deploying (local store is still updated)", false)
     .option("--skip-deploy", "update the local store only", false)
@@ -70,7 +70,7 @@ function addPagesCommands(root: Command): void {
   });
 }
 
-const HELP_TEXT = ["", "Quick start:", "  Run `alab pages setup`, then `alab pages put <directory>`.", "", "Deploys use the Cloudflare Pages API directly.", "Every deploy targets the configured production branch.", "--dry-run still updates the local store; it only skips the upload.", "Run `alab pages info` to inspect the active configuration.", ""].join("\n");
+const HELP_TEXT = ["", "Quick start:", "  Run `alab pages setup`, then `alab pages put <directory>`.", "  `alab pages put notes.md` publishes one Markdown file as a static page.", "", "Deploys use the Cloudflare Pages API directly.", "Every deploy targets the configured production branch.", "--dry-run still updates the local store; it only skips the upload.", "Run `alab pages info` to inspect the active configuration.", ""].join("\n");
 
 const PAGES_VERSION = "3.0.0";
 

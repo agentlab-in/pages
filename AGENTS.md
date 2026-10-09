@@ -163,10 +163,17 @@ Important: `--dry-run` is deployment-only. It does not make `put` or `remove`
 read-only. Both commands mutate local user state before deployment is skipped.
 Never run either against the real local store merely to inspect behavior.
 
-`put` requires a directory with an `index.html`, accepts at most 200 files and 5
-MiB total, and skips `.git`, `.alab`, `node_modules`, `.DS_Store`, `Thumbs.db`,
-and names beginning with `.env`. Explicit IDs normalize to lowercase and must be
-4 to 32 lowercase ASCII letters or digits.
+`put` requires a directory with an `index.html`, or a single `.md` or
+`.markdown` file. A Markdown file is staged as the original bytes plus an
+escaped static `index.html`. Its stable id lives in
+`<parent>/.alab/markdown/<filename>.json`, so publishing the same file again
+replaces that page. Front matter is plain text. The title is the first ATX
+heading, otherwise the filename. Empty files, invalid UTF-8, other file types,
+and staged pages over the size limit are rejected. The limit is the original
+file plus the rendered HTML, because the HTML contains a second copy of the text. A directory publish accepts at most
+200 files and 5 MiB total, and skips `.git`, `.alab`, `node_modules`,
+`.DS_Store`, `Thumbs.db`, and names beginning with `.env`. Explicit IDs
+normalize to lowercase and must be 4 to 32 lowercase ASCII letters or digits.
 
 `remove` (`delete` is an alias) rejects IDs absent from the local manifest.
 A successful local deletion before a failed deploy remains a local deletion.
